@@ -1,0 +1,96 @@
+{{define "bench.html"}}
+{{template "header" .}}
+<section class="bench-page" data-job-id="{{.JobID}}" data-status="{{.Status}}" data-lang="{{.Lang}}">
+  <div class="bench-head">
+    <h1 id="bench-status-title">
+      {{if eq .Status "running"}}{{T .Lang "bench.running"}}
+      {{else if eq .Status "stopped"}}{{T .Lang "bench.stopped"}}
+      {{else if eq .Status "failed"}}{{T .Lang "bench.failed"}}
+      {{else}}{{T .Lang "bench.done"}}{{end}}
+    </h1>
+    <div class="actions">
+      {{if or (eq .Status "running") (eq .Status "pending")}}
+      <button type="button" class="btn danger" id="btn-stop">{{T .Lang "bench.stop"}}</button>
+      {{end}}
+      <a class="btn" href="/?lang={{.Lang}}">{{T .Lang "bench.back"}}</a>
+      {{if .Report}}
+      <a class="btn primary" href="/bench/{{.JobID}}/pdf?lang={{.Lang}}">{{T .Lang "bench.download_pdf"}}</a>
+      <a class="btn" href="/bench/{{.JobID}}/report.json">{{T .Lang "bench.download_json"}}</a>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="progress-panel" id="progress-panel" {{if .Report}}hidden{{end}}>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:{{.Progress.ProgressPct}}%"></div></div>
+    <div class="stats grid-4">
+      <div><span class="label">{{T .Lang "bench.requests"}}</span><strong id="stat-total">{{.Progress.Total}}</strong></div>
+      <div><span class="label">{{T .Lang "bench.rps"}}</span><strong id="stat-rps">{{fmtFloat .Progress.RPS 2}}</strong></div>
+      <div><span class="label">{{T .Lang "bench.success_rate"}}</span><strong id="stat-rate">{{fmtFloat .Progress.SuccessRate 2}}%</strong></div>
+      <div><span class="label">{{T .Lang "bench.avg_latency"}}</span><strong id="stat-lat">{{fmtFloat .Progress.AvgLatencyMs 2}} ms</strong></div>
+    </div>
+  </div>
+
+  {{if .Report}}
+  <section class="report">
+    <h2>{{T .Lang "report.summary"}}</h2>
+    <dl class="kv">
+      <dt>{{T .Lang "report.target"}}</dt><dd><code>{{.Report.URL}}</code></dd>
+      <dt>{{T .Lang "report.params"}}</dt>
+      <dd>{{.Report.Method}} · {{T .Lang "home.concurrency"}} {{.Report.Concurrency}} · {{.Report.DurationSec}}s · timeout {{.Report.TimeoutSec}}s</dd>
+      <dt>{{T .Lang "report.generated_at"}}</dt><dd>{{.Report.FinishedAt.Format "2006-01-02 15:04:05"}}</dd>
+    </dl>
+
+    <h2>{{T .Lang "report.metrics"}}</h2>
+    <div class="stats grid-4">
+      <div><span class="label">{{T .Lang "report.total"}}</span><strong>{{.Report.Total}}</strong></div>
+      <div><span class="label">{{T .Lang "report.success"}}</span><strong>{{.Report.Success}}</strong></div>
+      <div><span class="label">{{T .Lang "report.failed"}}</span><strong>{{.Report.Failed}}</strong></div>
+      <div><span class="label">{{T .Lang "report.rps"}}</span><strong>{{fmtFloat .Report.RPS 2}}</strong></div>
+      <div><span class="label">{{T .Lang "bench.success_rate"}}</span><strong>{{fmtFloat .Report.SuccessRate 2}}%</strong></div>
+      <div><span class="label">{{T .Lang "report.duration"}}</span><strong>{{fmtFloat .Report.ElapsedSec 2}}s</strong></div>
+      <div><span class="label">{{T .Lang "report.bytes"}}</span><strong>{{.Report.BytesTotal}}</strong></div>
+    </div>
+
+    <h2>{{T .Lang "report.latency"}}</h2>
+    <div class="stats grid-4">
+      <div><span class="label">{{T .Lang "report.min"}}</span><strong>{{fmtFloat .Report.Latency.MinMs 2}}</strong></div>
+      <div><span class="label">{{T .Lang "report.avg"}}</span><strong>{{fmtFloat .Report.Latency.AvgMs 2}}</strong></div>
+      <div><span class="label">{{T .Lang "report.max"}}</span><strong>{{fmtFloat .Report.Latency.MaxMs 2}}</strong></div>
+      <div><span class="label">{{T .Lang "report.p50"}}</span><strong>{{fmtFloat .Report.Latency.P50Ms 2}}</strong></div>
+      <div><span class="label">{{T .Lang "report.p90"}}</span><strong>{{fmtFloat .Report.Latency.P90Ms 2}}</strong></div>
+      <div><span class="label">{{T .Lang "report.p95"}}</span><strong>{{fmtFloat .Report.Latency.P95Ms 2}}</strong></div>
+      <div><span class="label">{{T .Lang "report.p99"}}</span><strong>{{fmtFloat .Report.Latency.P99Ms 2}}</strong></div>
+    </div>
+
+    <h2>{{T .Lang "report.status"}}</h2>
+    <ul class="hist">
+      {{range $code, $n := .Report.StatusHistogram}}
+      <li><code>{{$code}}</code> — {{$n}}</li>
+      {{else}}
+      <li>-</li>
+      {{end}}
+    </ul>
+
+    <h2>{{T .Lang "report.errors"}}</h2>
+    <ul class="hist">
+      {{range $k, $n := .Report.ErrorHistogram}}
+      <li><code>{{$k}}</code> — {{$n}}</li>
+      {{else}}
+      <li>{{T .Lang "report.none_errors"}}</li>
+      {{end}}
+    </ul>
+
+    <h2>{{T .Lang "report.suggestions"}}</h2>
+    <ul class="suggestions">
+      {{range .Report.Suggestions}}
+      <li class="sev-{{.Severity}}">
+        <strong>{{T $.Lang (printf "report.severity.%s" .Severity)}} · {{.Title}}</strong>
+        <p>{{.Detail}}</p>
+      </li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+</section>
+{{template "footer" .}}
+{{end}}

@@ -1,0 +1,59 @@
+{{define "home.html"}}
+{{template "header" .}}
+<section class="hero">
+  <h1>{{T .Lang "home.title"}}</h1>
+  <p class="lead">{{T .Lang "home.subtitle"}}</p>
+  <p class="disclaimer">{{T .Lang "home.disclaimer"}}</p>
+  <p class="hint">{{printf (T .Lang "home.hint_limits") .MaxConcurrency .MaxDurationSec .MaxInflightJobs}}</p>
+</section>
+
+{{if .Error}}
+<div class="alert">{{.Error}}</div>
+{{end}}
+
+<form class="bench-form" method="post" action="/bench" id="bench-form">
+  <input type="hidden" name="lang" value="{{.Lang}}">
+
+  <label>
+    <span>{{T .Lang "home.url"}}</span>
+    <input type="url" name="url" required placeholder="https://example.com" value="{{.Form.URL}}">
+  </label>
+
+  <div class="grid-3">
+    <label>
+      <span>{{T .Lang "home.method"}}</span>
+      <select name="method">
+        {{range .Methods}}
+        <option value="{{.}}" {{if eq $.Form.Method .}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+    </label>
+    <label>
+      <span>{{T .Lang "home.concurrency"}}</span>
+      <input type="number" name="concurrency" min="1" max="{{.MaxConcurrency}}" value="{{.Form.Concurrency}}">
+    </label>
+    <label>
+      <span>{{T .Lang "home.duration"}}</span>
+      <input type="number" name="duration_sec" min="1" max="{{.MaxDurationSec}}" value="{{.Form.DurationSec}}">
+    </label>
+  </div>
+
+  <label>
+    <span>{{T .Lang "home.timeout"}}</span>
+    <input type="number" name="timeout_sec" min="1" max="{{.MaxTimeoutSec}}" value="{{.Form.TimeoutSec}}">
+  </label>
+
+  <label>
+    <span>{{T .Lang "home.headers"}}</span>
+    <textarea name="headers_text" rows="3" placeholder="Authorization: Bearer xxx">{{.Form.HeadersText}}</textarea>
+  </label>
+
+  <label class="check">
+    <input type="checkbox" name="confirm" value="true" {{if .Form.Confirm}}checked{{end}} required>
+    <span>{{T .Lang "home.confirm"}}</span>
+  </label>
+
+  <button type="submit" class="btn primary">{{T .Lang "home.submit"}}</button>
+</form>
+{{template "footer" .}}
+{{end}}

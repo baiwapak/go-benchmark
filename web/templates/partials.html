@@ -1,0 +1,31 @@
+{{define "header"}}
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{T .Lang "app.name"}} — {{T .Lang "app.tagline"}}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="/?lang={{.Lang}}">{{T .Lang "app.name"}}</a>
+      <nav class="lang-nav">
+        <a href="/lang/zh?next={{.NextPath}}" {{if eq .Lang "zh"}}class="active"{{end}}>{{T .Lang "nav.lang_zh"}}</a>
+        <a href="/lang/en?next={{.NextPath}}" {{if eq .Lang "en"}}class="active"{{end}}>{{T .Lang "nav.lang_en"}}</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+{{end}}
+
+{{define "footer"}}
+  </main>
+  <footer class="site-footer">
+    <div class="wrap">Go Benchmark · MIT</div>
+  </footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,46 @@
+package service
+
+import (
+	"testing"
+
+	"github.com/yourorg/go-benchmark/internal/config"
+	"github.com/yourorg/go-benchmark/internal/dto"
+	"github.com/yourorg/go-benchmark/internal/i18n"
+	"github.com/yourorg/go-benchmark/internal/service/store"
+	"github.com/yourorg/go-benchmark/pkg/apperr"
+)
+
+func TestCreateValidation(t *testing.T) {
+	_ = i18n.EnsureLoaded()
+	dir := t.TempDir()
+	fs, err := store.New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.Config{
+		DefaultLang:     "zh",
+		ReportDir:       dir,
+		MaxConcurrency:  50,
+		MaxDurationSec:  60,
+		MaxTimeoutSec:   30,
+		MaxInflightJobs: 2,
+	}
+	m := NewManager(cfg, fs)
+
+	_, err = m.Create(dto.CreateBenchRequest{URL: "https://example.com", Confirm: false})
+	if err == nil {
+		t.Fatal("expected confirm error")
+	}
+
+	_, err = m.Create(dto.CreateBenchRequest{URL: "ftp://x", Confirm: true})
+	if ae, ok := err.(*apperr.AppError); !ok || ae.Field != "url" {
+		t.Fatalf("url err=%v", err)
+	}
+
+	_, err = m.Create(dto.CreateBenchRequest{
+		URL: "https://example.com", Confirm: true, Concurrency: 999,
+	})
+	if ae, ok := err.(*apperr.AppError); !ok || ae.Field != "concurrency" {
+		t.Fatalf("concurrency err=%v", err)
+	}
+}
