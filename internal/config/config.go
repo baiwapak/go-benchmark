@@ -47,7 +47,7 @@ func Load() (*Config, error) {
 		MaxRampSec:            getenvInt("MAX_RAMP_SEC", 120),
 		MaxBodyBytes:          getenvInt("MAX_BODY_BYTES", 65536),
 		CreateRateLimitPerMin: getenvInt("CREATE_RATE_LIMIT_PER_MIN", 10),
-		GitHubRepoURL:         getenv("GITHUB_REPO_URL", "https://github.com/yourorg/go-benchmark"),
+		GitHubRepoURL:         getenv("GITHUB_REPO_URL", "https://github.com/baiwapak/go-benchmark"),
 		Host:                  host,
 		LimitsAuto:            limitsAuto,
 	}

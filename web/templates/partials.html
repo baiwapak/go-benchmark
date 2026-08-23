@@ -40,9 +40,26 @@
 {{define "footer"}}
   </main>
   <footer class="site-footer">
-    <div class="wrap">Go Benchmark · MIT</div>
+    <div class="wrap footer-inner">
+      <span class="footer-copy">Go Benchmark · MIT</span>
+      {{if and .GitHubUser .GitHubRepo}}
+      <div class="footer-github">
+        <a
+          class="github-button"
+          href="{{.GitHubURL}}"
+          data-icon="octicon-star"
+          data-size="large"
+          data-show-count="true"
+          aria-label="Star {{.GitHubUser}}/{{.GitHubRepo}} on GitHub"
+        >Star</a>
+      </div>
+      {{end}}
+    </div>
   </footer>
   <script src="/static/app.js"></script>
+  {{if and .GitHubUser .GitHubRepo}}
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
+  {{end}}
 </body>
 </html>
 {{end}}

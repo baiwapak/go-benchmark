@@ -384,6 +384,56 @@ func (m *Manager) ListReports(limit int) ([]dto.ReportSummary, error) {
 	return m.store.List(limit)
 }
 
+func (m *Manager) DeleteReport(id string) error {
+	m.mu.Lock()
+	job, ok := m.jobs[id]
+	m.mu.Unlock()
+	if ok {
+		job.mu.RLock()
+		st := job.Status
+		job.mu.RUnlock()
+		if st == StatusRunning || st == StatusPending {
+			return apperr.ErrConflict
+		}
+	}
+	if err := m.store.Delete(id); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	delete(m.jobs, id)
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *Manager) ClearReports() (int, error) {
+	skip := map[string]struct{}{}
+	m.mu.Lock()
+	for id, job := range m.jobs {
+		job.mu.RLock()
+		st := job.Status
+		job.mu.RUnlock()
+		if st == StatusRunning || st == StatusPending {
+			skip[id] = struct{}{}
+		}
+	}
+	m.mu.Unlock()
+
+	n, err := m.store.ClearExcept(skip)
+	if err != nil {
+		return n, err
+	}
+
+	m.mu.Lock()
+	for id := range m.jobs {
+		if _, keep := skip[id]; keep {
+			continue
+		}
+		delete(m.jobs, id)
+	}
+	m.mu.Unlock()
+	return n, nil
+}
+
 func parseHeadersText(text string) (map[string]string, error) {
 	out := map[string]string{}
 	for _, line := range strings.Split(text, "\n") {

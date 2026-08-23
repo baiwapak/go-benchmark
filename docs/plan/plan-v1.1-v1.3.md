@@ -23,6 +23,8 @@
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/reports` | 历史报告列表 |
+| POST | `/reports/:id/delete` | 删除单条报告 |
+| POST | `/reports/clear` | 清空全部报告 |
 | GET | `/reports/compare` | 报告对比 |
 
 ## 验收

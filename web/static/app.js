@@ -1,7 +1,19 @@
 (function () {
   initBenchForm();
   initBenchPage();
+  initConfirmForms();
 })();
+
+function initConfirmForms() {
+  document.querySelectorAll("form.js-confirm").forEach(function (form) {
+    form.addEventListener("submit", function (ev) {
+      const msg = form.getAttribute("data-confirm");
+      if (msg && !window.confirm(msg)) {
+        ev.preventDefault();
+      }
+    });
+  });
+}
 
 function initBenchForm() {
   const form = document.getElementById("bench-form");

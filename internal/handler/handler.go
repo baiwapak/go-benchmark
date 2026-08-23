@@ -42,7 +42,9 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	r.GET("/lang/:code", h.SetLang)
 	r.GET("/", h.Home)
 	r.GET("/reports", h.ReportsPage)
+	r.POST("/reports/clear", h.ClearReports)
 	r.GET("/reports/compare", h.ComparePage)
+	r.POST("/reports/:id/delete", h.DeleteReport)
 	r.GET("/glossary", h.GlossaryPage)
 
 	create := r.Group("/")
@@ -88,22 +90,52 @@ func (h *Handler) SetLang(c *gin.Context) {
 	c.Redirect(http.StatusFound, next+sep+"lang="+lang)
 }
 
-func (h *Handler) homePageData(lang string, extra gin.H) gin.H {
-	data := gin.H{
-		"Lang":             lang,
-		"NextPath":         "/",
-		"MaxConcurrency":   h.cfg.MaxConcurrency,
-		"MaxDurationSec":   h.cfg.MaxDurationSec,
-		"MaxTimeoutSec":    h.cfg.MaxTimeoutSec,
-		"MaxRampSec":       h.cfg.MaxRampSec,
-		"MaxInflightJobs":  h.cfg.MaxInflightJobs,
-		"HostCPUs":         h.cfg.Host.CPUs,
-		"HostMemGB":        capacity.MemGBForDisplay(h.cfg.Host),
-		"LimitsAuto":       h.cfg.LimitsAuto,
-		"Methods":          []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"},
-		"Presets":          preset.All,
-		"GitHubURL":        h.cfg.GitHubRepoURL,
+func parseGitHubRepo(raw string) (user, repo string) {
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimSuffix(raw, "/")
+	if raw == "" {
+		return "", ""
 	}
+	const marker = "github.com/"
+	idx := strings.Index(raw, marker)
+	if idx < 0 {
+		return "", ""
+	}
+	parts := strings.Split(strings.Trim(raw[idx+len(marker):], "/"), "/")
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", ""
+	}
+	return parts[0], parts[1]
+}
+
+func (h *Handler) chrome(lang, nextPath string, extra gin.H) gin.H {
+	ghUser, ghRepo := parseGitHubRepo(h.cfg.GitHubRepoURL)
+	data := gin.H{
+		"Lang":       lang,
+		"NextPath":   nextPath,
+		"GitHubURL":  h.cfg.GitHubRepoURL,
+		"GitHubUser": ghUser,
+		"GitHubRepo": ghRepo,
+	}
+	for k, v := range extra {
+		data[k] = v
+	}
+	return data
+}
+
+func (h *Handler) homePageData(lang string, extra gin.H) gin.H {
+	data := h.chrome(lang, "/", gin.H{
+		"MaxConcurrency":  h.cfg.MaxConcurrency,
+		"MaxDurationSec":  h.cfg.MaxDurationSec,
+		"MaxTimeoutSec":   h.cfg.MaxTimeoutSec,
+		"MaxRampSec":      h.cfg.MaxRampSec,
+		"MaxInflightJobs": h.cfg.MaxInflightJobs,
+		"HostCPUs":        h.cfg.Host.CPUs,
+		"HostMemGB":       capacity.MemGBForDisplay(h.cfg.Host),
+		"LimitsAuto":      h.cfg.LimitsAuto,
+		"Methods":         []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"},
+		"Presets":         preset.All,
+	})
 	for k, v := range extra {
 		data[k] = v
 	}
@@ -202,15 +234,13 @@ func (h *Handler) BenchPage(c *gin.Context) {
 	if rep != nil && len(rep.Series) > 0 {
 		series = rep.Series
 	}
-	h.web.HTML(c, "bench.html", gin.H{
-		"Lang":       lang,
-		"NextPath":   "/bench/" + job.ID,
-		"JobID":      job.ID,
-		"Status":     status,
-		"Progress":   prog,
-		"Report":     localizeReport(rep, lang),
-		"Series":     series,
-	})
+	h.web.HTML(c, "bench.html", h.chrome(lang, "/bench/"+job.ID, gin.H{
+		"JobID":    job.ID,
+		"Status":   status,
+		"Progress": prog,
+		"Report":   localizeReport(rep, lang),
+		"Series":   series,
+	}))
 }
 
 func localizeReport(rep *dto.BenchReport, lang string) *dto.BenchReport {
@@ -351,20 +381,44 @@ func (h *Handler) ReportsPage(c *gin.Context) {
 	if err != nil {
 		list = []dto.ReportSummary{}
 	}
-	h.web.HTML(c, "reports.html", gin.H{
-		"Lang":     lang,
-		"NextPath": "/reports",
-		"Reports":  list,
-	})
+	h.web.HTML(c, "reports.html", h.chrome(lang, "/reports", gin.H{
+		"Reports": list,
+	}))
+}
+
+func (h *Handler) DeleteReport(c *gin.Context) {
+	lang := h.langFrom(c)
+	err := h.mgr.DeleteReport(c.Param("id"))
+	if middleware.ClientWantsJSON(c) {
+		if err != nil {
+			h.writeErr(c, err)
+			return
+		}
+		response.OKMessage(c, "ok")
+		return
+	}
+	c.Redirect(http.StatusFound, "/reports?lang="+lang)
+}
+
+func (h *Handler) ClearReports(c *gin.Context) {
+	lang := h.langFrom(c)
+	_, err := h.mgr.ClearReports()
+	if middleware.ClientWantsJSON(c) {
+		if err != nil {
+			h.writeErr(c, err)
+			return
+		}
+		response.OKMessage(c, "ok")
+		return
+	}
+	c.Redirect(http.StatusFound, "/reports?lang="+lang)
 }
 
 func (h *Handler) GlossaryPage(c *gin.Context) {
 	lang := h.langFrom(c)
-	h.web.HTML(c, "glossary.html", gin.H{
-		"Lang":     lang,
-		"NextPath": "/glossary",
+	h.web.HTML(c, "glossary.html", h.chrome(lang, "/glossary", gin.H{
 		"Sections": glossary.Sections,
-	})
+	}))
 }
 
 func (h *Handler) ComparePage(c *gin.Context) {
@@ -385,13 +439,11 @@ func (h *Handler) ComparePage(c *gin.Context) {
 		}
 	}
 
-	h.web.HTML(c, "compare.html", gin.H{
-		"Lang":     lang,
-		"NextPath": "/reports/compare",
-		"Reports":  list,
-		"IDA":      idA,
-		"IDB":      idB,
-		"ReportA":  repA,
-		"ReportB":  repB,
-	})
+	h.web.HTML(c, "compare.html", h.chrome(lang, "/reports/compare", gin.H{
+		"Reports": list,
+		"IDA":     idA,
+		"IDB":     idB,
+		"ReportA": repA,
+		"ReportB": repB,
+	}))
 }

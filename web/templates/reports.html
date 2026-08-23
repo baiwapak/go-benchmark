@@ -7,6 +7,11 @@
     <div class="actions">
       <a class="btn" href="/?lang={{.Lang}}">{{T .Lang "nav.home"}}</a>
       <a class="btn primary" href="/reports/compare?lang={{.Lang}}">{{T .Lang "reports.compare"}}</a>
+      {{if .Reports}}
+      <form class="js-confirm inline-form" method="post" action="/reports/clear?lang={{.Lang}}" data-confirm="{{T .Lang "reports.clear_confirm"}}">
+        <button type="submit" class="btn danger">{{T .Lang "reports.clear"}}</button>
+      </form>
+      {{end}}
     </div>
   </div>
 
@@ -34,7 +39,10 @@
           <td>{{fmtFloat .SuccessRate 2}}%</td>
           <td>{{.Concurrency}}</td>
           <td class="actions-cell">
-            <a class="btn" href="/bench/{{.ID}}?lang={{$.Lang}}">{{T $.Lang "reports.view"}}</a>
+            <a class="btn compact" href="/bench/{{.ID}}?lang={{$.Lang}}">{{T $.Lang "reports.view"}}</a>
+            <form class="js-confirm inline-form" method="post" action="/reports/{{.ID}}/delete?lang={{$.Lang}}" data-confirm="{{T $.Lang "reports.delete_confirm"}}">
+              <button type="submit" class="btn danger compact">{{T $.Lang "reports.delete"}}</button>
+            </form>
           </td>
         </tr>
         {{end}}
