@@ -1,0 +1,49 @@
+{{define "reports.html"}}
+{{template "header" .}}
+<section class="reports-page">
+  <div class="page-head">
+    <h1>{{T .Lang "reports.title"}}</h1>
+    <p class="lead">{{T .Lang "reports.subtitle"}}</p>
+    <div class="actions">
+      <a class="btn" href="/?lang={{.Lang}}">{{T .Lang "nav.home"}}</a>
+      <a class="btn primary" href="/reports/compare?lang={{.Lang}}">{{T .Lang "reports.compare"}}</a>
+    </div>
+  </div>
+
+  {{if .Reports}}
+  <div class="report-table-wrap">
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>{{T .Lang "report.generated_at"}}</th>
+          <th>{{T .Lang "report.target"}}</th>
+          <th>{{T .Lang "home.method"}}</th>
+          <th>{{T .Lang "report.rps"}}</th>
+          <th>{{T .Lang "bench.success_rate"}}</th>
+          <th>{{T .Lang "home.concurrency"}}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Reports}}
+        <tr>
+          <td>{{.FinishedAt.Format "2006-01-02 15:04"}}</td>
+          <td class="url-cell"><code>{{.URL}}</code></td>
+          <td>{{.Method}}</td>
+          <td>{{fmtFloat .RPS 2}}</td>
+          <td>{{fmtFloat .SuccessRate 2}}%</td>
+          <td>{{.Concurrency}}</td>
+          <td class="actions-cell">
+            <a class="btn" href="/bench/{{.ID}}?lang={{$.Lang}}">{{T $.Lang "reports.view"}}</a>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="hint">{{T .Lang "reports.empty"}}</p>
+  {{end}}
+</section>
+{{template "footer" .}}
+{{end}}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/yourorg/go-benchmark/internal/dto"
@@ -60,4 +61,44 @@ func (s *FileStore) Load(id string) (*dto.BenchReport, error) {
 func (s *FileStore) Exists(id string) bool {
 	_, err := os.Stat(s.path(id))
 	return err == nil
+}
+
+func (s *FileStore) List(limit int) ([]dto.ReportSummary, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	entries, err := os.ReadDir(s.dir)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dto.ReportSummary, 0, len(entries))
+	for _, ent := range entries {
+		if ent.IsDir() || filepath.Ext(ent.Name()) != ".json" {
+			continue
+		}
+		id := ent.Name()[:len(ent.Name())-5]
+		rep, err := s.Load(id)
+		if err != nil {
+			continue
+		}
+		out = append(out, dto.ReportSummary{
+			ID:          rep.ID,
+			URL:         rep.URL,
+			Method:      rep.Method,
+			Status:      rep.Status,
+			RPS:         rep.RPS,
+			SuccessRate: rep.SuccessRate,
+			Concurrency: rep.Concurrency,
+			DurationSec: rep.DurationSec,
+			StartedAt:   rep.StartedAt,
+			FinishedAt:  rep.FinishedAt,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].FinishedAt.After(out[j].FinishedAt)
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
 }

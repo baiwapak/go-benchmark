@@ -10,10 +10,13 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/yourorg/go-benchmark/internal/capacity"
 	"github.com/yourorg/go-benchmark/internal/config"
 	"github.com/yourorg/go-benchmark/internal/dto"
+	"github.com/yourorg/go-benchmark/internal/glossary"
 	"github.com/yourorg/go-benchmark/internal/i18n"
 	"github.com/yourorg/go-benchmark/internal/middleware"
+	"github.com/yourorg/go-benchmark/internal/preset"
 	"github.com/yourorg/go-benchmark/internal/service"
 	"github.com/yourorg/go-benchmark/internal/service/pdf"
 	"github.com/yourorg/go-benchmark/internal/service/report"
@@ -38,6 +41,9 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	})
 	r.GET("/lang/:code", h.SetLang)
 	r.GET("/", h.Home)
+	r.GET("/reports", h.ReportsPage)
+	r.GET("/reports/compare", h.ComparePage)
+	r.GET("/glossary", h.GlossaryPage)
 
 	create := r.Group("/")
 	create.Use(middleware.RateLimit(h.cfg.CreateRateLimitPerMin))
@@ -82,23 +88,38 @@ func (h *Handler) SetLang(c *gin.Context) {
 	c.Redirect(http.StatusFound, next+sep+"lang="+lang)
 }
 
-func (h *Handler) Home(c *gin.Context) {
-	lang := h.langFrom(c)
-	h.web.HTML(c, "home.html", gin.H{
+func (h *Handler) homePageData(lang string, extra gin.H) gin.H {
+	data := gin.H{
 		"Lang":             lang,
 		"NextPath":         "/",
 		"MaxConcurrency":   h.cfg.MaxConcurrency,
 		"MaxDurationSec":   h.cfg.MaxDurationSec,
 		"MaxTimeoutSec":    h.cfg.MaxTimeoutSec,
+		"MaxRampSec":       h.cfg.MaxRampSec,
 		"MaxInflightJobs":  h.cfg.MaxInflightJobs,
+		"HostCPUs":         h.cfg.Host.CPUs,
+		"HostMemGB":        capacity.MemGBForDisplay(h.cfg.Host),
+		"LimitsAuto":       h.cfg.LimitsAuto,
 		"Methods":          []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"},
+		"Presets":          preset.All,
+		"GitHubURL":        h.cfg.GitHubRepoURL,
+	}
+	for k, v := range extra {
+		data[k] = v
+	}
+	return data
+}
+
+func (h *Handler) Home(c *gin.Context) {
+	lang := h.langFrom(c)
+	h.web.HTML(c, "home.html", h.homePageData(lang, gin.H{
 		"Form": dto.CreateBenchRequest{
 			Method:      "GET",
 			Concurrency: 10,
 			DurationSec: 10,
 			TimeoutSec:  10,
 		},
-	})
+	}))
 }
 
 func (h *Handler) CreateBench(c *gin.Context) {
@@ -118,6 +139,10 @@ func (h *Handler) CreateBench(c *gin.Context) {
 	if v := c.PostForm("timeout_sec"); v != "" {
 		req.TimeoutSec, _ = strconv.Atoi(v)
 	}
+	if v := c.PostForm("ramp_sec"); v != "" {
+		req.RampSec, _ = strconv.Atoi(v)
+	}
+	req.BodyText = c.PostForm("body_text")
 
 	job, err := h.mgr.Create(req)
 	if err != nil {
@@ -156,17 +181,10 @@ func (h *Handler) renderCreateError(c *gin.Context, lang string, req dto.CreateB
 		return
 	}
 	req.Lang = lang
-	h.web.HTML(c, "home.html", gin.H{
-		"Lang":            lang,
-		"NextPath":        "/",
-		"Error":           msg,
-		"MaxConcurrency":  h.cfg.MaxConcurrency,
-		"MaxDurationSec":  h.cfg.MaxDurationSec,
-		"MaxTimeoutSec":   h.cfg.MaxTimeoutSec,
-		"MaxInflightJobs": h.cfg.MaxInflightJobs,
-		"Methods":         []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"},
-		"Form":            req,
-	})
+	h.web.HTML(c, "home.html", h.homePageData(lang, gin.H{
+		"Error": msg,
+		"Form":  req,
+	}))
 }
 
 func (h *Handler) BenchPage(c *gin.Context) {
@@ -180,13 +198,18 @@ func (h *Handler) BenchPage(c *gin.Context) {
 	rep := h.mgr.ReportOf(job)
 	// Prefer request lang for UI chrome; report body keeps job lang for suggestions already stored.
 	status := string(job.Status)
+	series := prog.Series
+	if rep != nil && len(rep.Series) > 0 {
+		series = rep.Series
+	}
 	h.web.HTML(c, "bench.html", gin.H{
-		"Lang":     lang,
-		"NextPath": "/bench/" + job.ID,
-		"JobID":    job.ID,
-		"Status":   status,
-		"Progress": prog,
-		"Report":   localizeReport(rep, lang),
+		"Lang":       lang,
+		"NextPath":   "/bench/" + job.ID,
+		"JobID":      job.ID,
+		"Status":     status,
+		"Progress":   prog,
+		"Report":     localizeReport(rep, lang),
+		"Series":     series,
 	})
 }
 
@@ -320,4 +343,55 @@ func (h *Handler) notFound(c *gin.Context, lang string) {
 		return
 	}
 	c.String(http.StatusNotFound, i18n.T(lang, "err.not_found"))
+}
+
+func (h *Handler) ReportsPage(c *gin.Context) {
+	lang := h.langFrom(c)
+	list, err := h.mgr.ListReports(50)
+	if err != nil {
+		list = []dto.ReportSummary{}
+	}
+	h.web.HTML(c, "reports.html", gin.H{
+		"Lang":     lang,
+		"NextPath": "/reports",
+		"Reports":  list,
+	})
+}
+
+func (h *Handler) GlossaryPage(c *gin.Context) {
+	lang := h.langFrom(c)
+	h.web.HTML(c, "glossary.html", gin.H{
+		"Lang":     lang,
+		"NextPath": "/glossary",
+		"Sections": glossary.Sections,
+	})
+}
+
+func (h *Handler) ComparePage(c *gin.Context) {
+	lang := h.langFrom(c)
+	list, _ := h.mgr.ListReports(50)
+	idA := strings.TrimSpace(c.Query("a"))
+	idB := strings.TrimSpace(c.Query("b"))
+
+	var repA, repB *dto.BenchReport
+	if idA != "" {
+		if job, err := h.mgr.Get(idA); err == nil {
+			repA = localizeReport(h.mgr.ReportOf(job), lang)
+		}
+	}
+	if idB != "" {
+		if job, err := h.mgr.Get(idB); err == nil {
+			repB = localizeReport(h.mgr.ReportOf(job), lang)
+		}
+	}
+
+	h.web.HTML(c, "compare.html", gin.H{
+		"Lang":     lang,
+		"NextPath": "/reports/compare",
+		"Reports":  list,
+		"IDA":      idA,
+		"IDB":      idB,
+		"ReportA":  repA,
+		"ReportB":  repB,
+	})
 }

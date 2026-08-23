@@ -1,0 +1,25 @@
+{{define "glossary.html"}}
+{{template "header" .}}
+<section class="glossary-page">
+  <div class="page-head">
+    <h1>{{T .Lang "glossary.title"}}</h1>
+    <p class="lead">{{T .Lang "glossary.subtitle"}}</p>
+    <a class="btn" href="/?lang={{.Lang}}">{{T .Lang "nav.home"}}</a>
+  </div>
+
+  {{range .Sections}}
+  <section class="glossary-section">
+    <h2>{{T $.Lang .TitleKey}}</h2>
+    <dl class="glossary-list">
+      {{range .TermIDs}}
+      <div class="glossary-term" id="term-{{.}}">
+        <dt>{{T $.Lang (printf "glossary.term.%s.title" .)}}</dt>
+        <dd>{{T $.Lang (printf "glossary.term.%s.body" .)}}</dd>
+      </div>
+      {{end}}
+    </dl>
+  </section>
+  {{end}}
+</section>
+{{template "footer" .}}
+{{end}}

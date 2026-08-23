@@ -1,0 +1,74 @@
+{{define "compare.html"}}
+{{template "header" .}}
+<section class="compare-page">
+  <div class="page-head">
+    <h1>{{T .Lang "compare.title"}}</h1>
+    <p class="lead">{{T .Lang "compare.subtitle"}}</p>
+    <a class="btn" href="/reports?lang={{.Lang}}">{{T .Lang "reports.title"}}</a>
+  </div>
+
+  <form class="compare-form" method="get" action="/reports/compare">
+    <input type="hidden" name="lang" value="{{.Lang}}">
+    <label>
+      <span>{{T .Lang "compare.report_a"}}</span>
+      <select name="a" required>
+        <option value="">{{T .Lang "compare.select"}}</option>
+        {{range .Reports}}
+        <option value="{{.ID}}" {{if eq $.IDA .ID}}selected{{end}}>{{.FinishedAt.Format "01-02 15:04"}} · {{.URL}} · {{fmtFloat .RPS 2}} RPS</option>
+        {{end}}
+      </select>
+    </label>
+    <label>
+      <span>{{T .Lang "compare.report_b"}}</span>
+      <select name="b" required>
+        <option value="">{{T .Lang "compare.select"}}</option>
+        {{range .Reports}}
+        <option value="{{.ID}}" {{if eq $.IDB .ID}}selected{{end}}>{{.FinishedAt.Format "01-02 15:04"}} · {{.URL}} · {{fmtFloat .RPS 2}} RPS</option>
+        {{end}}
+      </select>
+    </label>
+    <button type="submit" class="btn primary">{{T .Lang "compare.submit"}}</button>
+  </form>
+
+  {{if and .ReportA .ReportB}}
+  <div class="compare-grid">
+    <div class="compare-card">
+      <span class="label">{{T .Lang "report.rps"}}</span>
+      <div class="compare-values"><strong>{{fmtFloat .ReportA.RPS 2}}</strong><span class="vs">→</span><strong>{{fmtFloat .ReportB.RPS 2}}</strong></div>
+      <span class="delta {{deltaClass .ReportA.RPS .ReportB.RPS true}}">{{deltaText .ReportA.RPS .ReportB.RPS}}</span>
+    </div>
+    <div class="compare-card">
+      <span class="label">{{T .Lang "bench.success_rate"}}</span>
+      <div class="compare-values"><strong>{{fmtFloat .ReportA.SuccessRate 2}}%</strong><span class="vs">→</span><strong>{{fmtFloat .ReportB.SuccessRate 2}}%</strong></div>
+      <span class="delta {{deltaClass .ReportA.SuccessRate .ReportB.SuccessRate true}}">{{deltaText .ReportA.SuccessRate .ReportB.SuccessRate}}</span>
+    </div>
+    <div class="compare-card">
+      <span class="label">{{T .Lang "report.avg"}}</span>
+      <div class="compare-values"><strong>{{fmtFloat .ReportA.Latency.AvgMs 2}}</strong><span class="vs">→</span><strong>{{fmtFloat .ReportB.Latency.AvgMs 2}}</strong></div>
+      <span class="delta {{deltaClass .ReportA.Latency.AvgMs .ReportB.Latency.AvgMs false}}">{{deltaText .ReportA.Latency.AvgMs .ReportB.Latency.AvgMs}}</span>
+    </div>
+    <div class="compare-card">
+      <span class="label">{{T .Lang "report.p90"}}</span>
+      <div class="compare-values"><strong>{{fmtFloat .ReportA.Latency.P90Ms 2}}</strong><span class="vs">→</span><strong>{{fmtFloat .ReportB.Latency.P90Ms 2}}</strong></div>
+      <span class="delta {{deltaClass .ReportA.Latency.P90Ms .ReportB.Latency.P90Ms false}}">{{deltaText .ReportA.Latency.P90Ms .ReportB.Latency.P90Ms}}</span>
+    </div>
+    <div class="compare-card">
+      <span class="label">{{T .Lang "report.p99"}}</span>
+      <div class="compare-values"><strong>{{fmtFloat .ReportA.Latency.P99Ms 2}}</strong><span class="vs">→</span><strong>{{fmtFloat .ReportB.Latency.P99Ms 2}}</strong></div>
+      <span class="delta {{deltaClass .ReportA.Latency.P99Ms .ReportB.Latency.P99Ms false}}">{{deltaText .ReportA.Latency.P99Ms .ReportB.Latency.P99Ms}}</span>
+    </div>
+    <div class="compare-card">
+      <span class="label">{{T .Lang "report.total"}}</span>
+      <div class="compare-values"><strong>{{.ReportA.Total}}</strong><span class="vs">→</span><strong>{{.ReportB.Total}}</strong></div>
+    </div>
+  </div>
+  <div class="compare-links">
+    <a href="/bench/{{.IDA}}?lang={{.Lang}}">{{T .Lang "compare.open_a"}}</a>
+    <a href="/bench/{{.IDB}}?lang={{.Lang}}">{{T .Lang "compare.open_b"}}</a>
+  </div>
+  {{else if or .IDA .IDB}}
+  <p class="hint">{{T .Lang "compare.need_two"}}</p>
+  {{end}}
+</section>
+{{template "footer" .}}
+{{end}}

@@ -13,6 +13,7 @@ import (
 	"github.com/yourorg/go-benchmark/internal/config"
 	"github.com/yourorg/go-benchmark/internal/dto"
 	"github.com/yourorg/go-benchmark/internal/i18n"
+	"github.com/yourorg/go-benchmark/internal/security"
 	"github.com/yourorg/go-benchmark/internal/service/loadtest"
 	"github.com/yourorg/go-benchmark/internal/service/report"
 	"github.com/yourorg/go-benchmark/internal/service/store"
@@ -36,6 +37,7 @@ type Job struct {
 	Params      loadtest.Params
 	DurationSec int
 	TimeoutSec  int
+	RampSec     int
 	StartedAt   time.Time
 	FinishedAt  time.Time
 	ErrorMsg    string
@@ -76,6 +78,9 @@ func (m *Manager) Create(req dto.CreateBenchRequest) (*Job, error) {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return nil, apperr.Validation("url", i18n.T(lang, "err.url_invalid"))
 	}
+	if !security.ValidateTargetURL(rawURL) {
+		return nil, apperr.Validation("url", i18n.T(lang, "err.url_ssrf"))
+	}
 
 	method := strings.ToUpper(strings.TrimSpace(req.Method))
 	if method == "" {
@@ -109,6 +114,26 @@ func (m *Manager) Create(req dto.CreateBenchRequest) (*Job, error) {
 	}
 	if timeoutSec > m.cfg.MaxTimeoutSec {
 		return nil, apperr.Validation("timeout_sec", i18n.T(lang, "err.timeout"))
+	}
+
+	rampSec := req.RampSec
+	if rampSec < 0 {
+		rampSec = 0
+	}
+	if rampSec > m.cfg.MaxRampSec {
+		return nil, apperr.Validation("ramp_sec", i18n.T(lang, "err.ramp"))
+	}
+	if rampSec > durationSec {
+		return nil, apperr.Validation("ramp_sec", i18n.T(lang, "err.ramp_duration"))
+	}
+
+	bodyText := strings.TrimSpace(req.BodyText)
+	if len(bodyText) > m.cfg.MaxBodyBytes {
+		return nil, apperr.Validation("body_text", i18n.T(lang, "err.body"))
+	}
+	switch method {
+	case http.MethodGet, http.MethodHead:
+		bodyText = ""
 	}
 
 	headers := map[string]string{}
@@ -148,10 +173,13 @@ func (m *Manager) Create(req dto.CreateBenchRequest) (*Job, error) {
 		Status:      StatusPending,
 		DurationSec: durationSec,
 		TimeoutSec:  timeoutSec,
+		RampSec:     rampSec,
 		Params: loadtest.Params{
 			URL:         rawURL,
 			Method:      method,
+			Body:        bodyText,
 			Concurrency: concurrency,
+			Ramp:        time.Duration(rampSec) * time.Second,
 			Duration:    time.Duration(durationSec) * time.Second,
 			Timeout:     time.Duration(timeoutSec) * time.Second,
 			Headers:     headers,
@@ -218,6 +246,7 @@ func (m *Manager) run(ctx context.Context, job *Job) {
 		URL:          job.Params.URL,
 		Method:       job.Params.Method,
 		Concurrency:  job.Params.Concurrency,
+		RampSec:      job.RampSec,
 		DurationSec:  job.DurationSec,
 		TimeoutSec:   job.TimeoutSec,
 		Headers:      job.Params.Headers,
@@ -286,6 +315,7 @@ func (m *Manager) Get(id string) (*Job, error) {
 		Status:      JobStatus(rep.Status),
 		DurationSec: rep.DurationSec,
 		TimeoutSec:  rep.TimeoutSec,
+		RampSec:     rep.RampSec,
 		StartedAt:   rep.StartedAt,
 		FinishedAt:  rep.FinishedAt,
 		ErrorMsg:    rep.ErrorMessage,
@@ -294,6 +324,7 @@ func (m *Manager) Get(id string) (*Job, error) {
 			URL:         rep.URL,
 			Method:      rep.Method,
 			Concurrency: rep.Concurrency,
+			Ramp:        time.Duration(rep.RampSec) * time.Second,
 			Headers:     rep.Headers,
 		},
 		Agg:  report.NewAggregator(),
@@ -347,6 +378,10 @@ func (m *Manager) ReportOf(job *Job) *dto.BenchReport {
 	job.mu.RLock()
 	defer job.mu.RUnlock()
 	return job.Report
+}
+
+func (m *Manager) ListReports(limit int) ([]dto.ReportSummary, error) {
+	return m.store.List(limit)
 }
 
 func parseHeadersText(text string) (map[string]string, error) {

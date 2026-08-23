@@ -44,6 +44,9 @@ func Render(rep *dto.BenchReport) ([]byte, error) {
 	writeKV(pdf, fontFamily, i18n.T(lang, "home.method"), rep.Method)
 	writeKV(pdf, fontFamily, "Status", rep.Status)
 	writeKV(pdf, fontFamily, i18n.T(lang, "home.concurrency"), strconv.Itoa(rep.Concurrency))
+	if rep.RampSec > 0 {
+		writeKV(pdf, fontFamily, i18n.T(lang, "home.ramp"), strconv.Itoa(rep.RampSec))
+	}
 	writeKV(pdf, fontFamily, i18n.T(lang, "home.duration"), strconv.Itoa(rep.DurationSec))
 	writeKV(pdf, fontFamily, i18n.T(lang, "home.timeout"), strconv.Itoa(rep.TimeoutSec))
 	writeKV(pdf, fontFamily, i18n.T(lang, "report.generated_at"), rep.FinishedAt.Format(time.RFC3339))

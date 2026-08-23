@@ -26,6 +26,9 @@ func TestValidateLimits(t *testing.T) {
 func TestLoadDefaults(t *testing.T) {
 	_ = os.Unsetenv("SERVER_ADDR")
 	_ = os.Unsetenv("DEFAULT_LANG")
+	_ = os.Unsetenv("MAX_CONCURRENCY")
+	_ = os.Unsetenv("MAX_DURATION_SEC")
+	_ = os.Unsetenv("MAX_INFLIGHT_JOBS")
 	cfg, err := Load()
 	if err != nil {
 		t.Fatal(err)
@@ -35,5 +38,11 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.DefaultLang != "zh" {
 		t.Fatalf("lang=%s", cfg.DefaultLang)
+	}
+	if !cfg.LimitsAuto {
+		t.Fatal("expected auto limits when env unset")
+	}
+	if cfg.MaxConcurrency < 10 {
+		t.Fatalf("concurrency=%d", cfg.MaxConcurrency)
 	}
 }

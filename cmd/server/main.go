@@ -41,6 +41,9 @@ func main() {
 	h.RegisterRoutes(r)
 
 	log.Printf("go-benchmark listening on %s (lang=%s)", cfg.ServerAddr, cfg.DefaultLang)
+	log.Printf("limits: concurrency<=%d duration<=%ds inflight<=%d | host %d CPU %d MB avail | auto=%v",
+		cfg.MaxConcurrency, cfg.MaxDurationSec, cfg.MaxInflightJobs,
+		cfg.Host.CPUs, cfg.Host.MemAvailMB, cfg.LimitsAuto)
 	if err := r.Run(cfg.ServerAddr); err != nil {
 		log.Fatalf("listen: %v", err)
 	}

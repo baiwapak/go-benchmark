@@ -8,24 +8,34 @@ type CreateBenchRequest struct {
 	Concurrency int               `json:"concurrency" form:"concurrency"`
 	DurationSec int               `json:"duration_sec" form:"duration_sec"`
 	TimeoutSec  int               `json:"timeout_sec" form:"timeout_sec"`
+	RampSec     int               `json:"ramp_sec" form:"ramp_sec"`
+	BodyText    string            `json:"body_text" form:"body_text"`
 	HeadersText string            `json:"headers_text" form:"headers_text"`
 	Headers     map[string]string `json:"headers"`
 	Confirm     bool              `json:"confirm" form:"confirm"`
 	Lang        string            `json:"lang" form:"lang"`
 }
 
-type ProgressSnapshot struct {
-	JobID        string  `json:"job_id"`
-	Status       string  `json:"status"`
-	ElapsedSec   float64 `json:"elapsed_sec"`
-	ProgressPct  float64 `json:"progress_pct"`
-	Total        int64   `json:"total"`
-	Success      int64   `json:"success"`
-	Failed       int64   `json:"failed"`
+type TimeSeriesPoint struct {
+	Second       int     `json:"second"`
 	RPS          float64 `json:"rps"`
-	SuccessRate  float64 `json:"success_rate"`
 	AvgLatencyMs float64 `json:"avg_latency_ms"`
-	Message      string  `json:"message,omitempty"`
+	SuccessRate  float64 `json:"success_rate"`
+}
+
+type ProgressSnapshot struct {
+	JobID        string            `json:"job_id"`
+	Status       string            `json:"status"`
+	ElapsedSec   float64           `json:"elapsed_sec"`
+	ProgressPct  float64           `json:"progress_pct"`
+	Total        int64             `json:"total"`
+	Success      int64             `json:"success"`
+	Failed       int64             `json:"failed"`
+	RPS          float64           `json:"rps"`
+	SuccessRate  float64           `json:"success_rate"`
+	AvgLatencyMs float64           `json:"avg_latency_ms"`
+	Series       []TimeSeriesPoint `json:"series,omitempty"`
+	Message      string            `json:"message,omitempty"`
 }
 
 type LatencyStats struct {
@@ -52,6 +62,7 @@ type BenchReport struct {
 	URL             string             `json:"url"`
 	Method          string             `json:"method"`
 	Concurrency     int                `json:"concurrency"`
+	RampSec         int                `json:"ramp_sec"`
 	DurationSec     int                `json:"duration_sec"`
 	TimeoutSec      int                `json:"timeout_sec"`
 	Headers         map[string]string  `json:"headers,omitempty"`
@@ -65,8 +76,22 @@ type BenchReport struct {
 	RPS             float64            `json:"rps"`
 	BytesTotal      int64              `json:"bytes_total"`
 	Latency         LatencyStats       `json:"latency"`
+	Series          []TimeSeriesPoint  `json:"series,omitempty"`
 	StatusHistogram map[string]int64   `json:"status_histogram"`
 	ErrorHistogram  map[string]int64   `json:"error_histogram"`
 	Suggestions     []Suggestion       `json:"suggestions"`
 	ErrorMessage    string             `json:"error_message,omitempty"`
+}
+
+type ReportSummary struct {
+	ID          string    `json:"id"`
+	URL         string    `json:"url"`
+	Method      string    `json:"method"`
+	Status      string    `json:"status"`
+	RPS         float64   `json:"rps"`
+	SuccessRate float64   `json:"success_rate"`
+	Concurrency int       `json:"concurrency"`
+	DurationSec int       `json:"duration_sec"`
+	StartedAt   time.Time `json:"started_at"`
+	FinishedAt  time.Time `json:"finished_at"`
 }

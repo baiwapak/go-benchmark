@@ -12,12 +12,29 @@
     <div class="wrap header-inner">
       <a class="brand" href="/?lang={{.Lang}}">{{T .Lang "app.name"}}</a>
       <nav class="lang-nav">
+        <a href="/reports?lang={{.Lang}}">{{T .Lang "nav.reports"}}</a>
+        <a href="/glossary?lang={{.Lang}}">{{T .Lang "nav.glossary"}}</a>
         <a href="/lang/zh?next={{.NextPath}}" {{if eq .Lang "zh"}}class="active"{{end}}>{{T .Lang "nav.lang_zh"}}</a>
         <a href="/lang/en?next={{.NextPath}}" {{if eq .Lang "en"}}class="active"{{end}}>{{T .Lang "nav.lang_en"}}</a>
       </nav>
     </div>
   </header>
   <main class="wrap">
+{{end}}
+
+{{define "labelTip"}}
+<span class="label label-with-tip">
+  {{T .Lang .LabelKey}}
+  <button type="button" class="tip-trigger" aria-label="{{T .Lang .TipKey}}">?</button>
+  <span class="tip-bubble" role="tooltip">{{T .Lang .TipKey}}</span>
+</span>
+{{end}}
+
+{{define "tipIcon"}}
+<span class="tip-wrap">
+  <button type="button" class="tip-trigger" aria-label="{{T .Lang .Key}}">?</button>
+  <span class="tip-bubble" role="tooltip">{{T .Lang .Key}}</span>
+</span>
 {{end}}
 
 {{define "footer"}}

@@ -4,25 +4,82 @@
   <h1>{{T .Lang "home.title"}}</h1>
   <p class="lead">{{T .Lang "home.subtitle"}}</p>
   <p class="disclaimer">{{T .Lang "home.disclaimer"}}</p>
-  <p class="hint">{{printf (T .Lang "home.hint_limits") .MaxConcurrency .MaxDurationSec .MaxInflightJobs}}</p>
+  <p class="hint">
+    {{if .LimitsAuto}}
+    {{printf (T .Lang "home.hint_limits_auto") .HostCPUs .HostMemGB .MaxConcurrency .MaxDurationSec .MaxInflightJobs}}
+    {{else}}
+    {{printf (T .Lang "home.hint_limits_env") .MaxConcurrency .MaxDurationSec .MaxInflightJobs}}
+    {{end}}
+  </p>
 </section>
 
 {{if .Error}}
-<div class="alert">{{.Error}}</div>
+<div class="alert" id="form-error">{{.Error}}</div>
+{{else}}
+<div class="alert" id="form-error" hidden></div>
 {{end}}
 
-<form class="bench-form" method="post" action="/bench" id="bench-form">
+<form
+  class="bench-form"
+  method="post"
+  action="/bench"
+  id="bench-form"
+  novalidate
+  data-max-concurrency="{{.MaxConcurrency}}"
+  data-max-duration="{{.MaxDurationSec}}"
+  data-max-timeout="{{.MaxTimeoutSec}}"
+  data-max-ramp="{{.MaxRampSec}}"
+  data-msg-url-required="{{T .Lang "err.url_required"}}"
+  data-msg-url-invalid="{{T .Lang "err.url_invalid"}}"
+  data-msg-confirm-required="{{T .Lang "err.confirm_required"}}"
+  data-msg-concurrency="{{T .Lang "err.concurrency"}}"
+  data-msg-duration="{{T .Lang "err.duration"}}"
+  data-msg-timeout="{{T .Lang "err.timeout"}}"
+  data-msg-ramp="{{T .Lang "err.ramp"}}"
+  data-msg-ramp-duration="{{T .Lang "err.ramp_duration"}}"
+  data-msg-headers="{{T .Lang "err.headers"}}"
+  data-msg-body="{{T .Lang "err.body"}}"
+>
   <input type="hidden" name="lang" value="{{.Lang}}">
 
   <label>
     <span>{{T .Lang "home.url"}}</span>
-    <input type="url" name="url" required placeholder="https://example.com" value="{{.Form.URL}}">
+    <input type="text" name="url" inputmode="url" autocomplete="url" placeholder="https://example.com" value="{{.Form.URL}}">
+    <span class="field-error" data-field="url"></span>
   </label>
+
+  <section class="preset-panel" id="preset-panel" aria-labelledby="preset-title">
+    <div class="preset-head">
+      <h2 id="preset-title">{{T .Lang "home.preset.title"}}</h2>
+      <p class="preset-hint">{{T .Lang "home.preset.hint"}}</p>
+    </div>
+    <div class="preset-grid" role="group" aria-label="{{T .Lang "home.preset.title"}}">
+      {{range .Presets}}
+      <button
+        type="button"
+        class="preset-card"
+        data-id="{{.ID}}"
+        data-concurrency="{{.Concurrency}}"
+        data-duration="{{.DurationSec}}"
+        data-timeout="{{.TimeoutSec}}"
+        data-rationale="{{T $.Lang .RationaleKey}}"
+      >
+        <strong class="preset-name">{{T $.Lang .NameKey}}</strong>
+        <span class="preset-spec">{{T $.Lang .SpecKey}}</span>
+        <span class="preset-params">{{printf (T $.Lang "home.preset.params") .Concurrency .DurationSec .TimeoutSec}}</span>
+      </button>
+      {{end}}
+    </div>
+    <div class="preset-rationale" id="preset-rationale" hidden>
+      <strong>{{T .Lang "home.preset.why"}}</strong>
+      <p id="preset-rationale-text"></p>
+    </div>
+  </section>
 
   <div class="grid-3">
     <label>
       <span>{{T .Lang "home.method"}}</span>
-      <select name="method">
+      <select name="method" id="method-select">
         {{range .Methods}}
         <option value="{{.}}" {{if eq $.Form.Method .}}selected{{end}}>{{.}}</option>
         {{end}}
@@ -30,30 +87,59 @@
     </label>
     <label>
       <span>{{T .Lang "home.concurrency"}}</span>
-      <input type="number" name="concurrency" min="1" max="{{.MaxConcurrency}}" value="{{.Form.Concurrency}}">
+      <input type="number" name="concurrency" value="{{.Form.Concurrency}}">
+      <span class="field-error" data-field="concurrency"></span>
     </label>
     <label>
       <span>{{T .Lang "home.duration"}}</span>
-      <input type="number" name="duration_sec" min="1" max="{{.MaxDurationSec}}" value="{{.Form.DurationSec}}">
+      <input type="number" name="duration_sec" value="{{.Form.DurationSec}}">
+      <span class="field-error" data-field="duration_sec"></span>
     </label>
   </div>
 
-  <label>
-    <span>{{T .Lang "home.timeout"}}</span>
-    <input type="number" name="timeout_sec" min="1" max="{{.MaxTimeoutSec}}" value="{{.Form.TimeoutSec}}">
+  <div class="grid-3">
+    <label>
+      <span>{{T .Lang "home.timeout"}}</span>
+      <input type="number" name="timeout_sec" value="{{.Form.TimeoutSec}}">
+      <span class="field-error" data-field="timeout_sec"></span>
+    </label>
+    <label>
+      <span>{{T .Lang "home.ramp"}}</span>
+      <input type="number" name="ramp_sec" value="{{.Form.RampSec}}" placeholder="0">
+      <span class="field-hint">{{T .Lang "home.ramp_hint"}}</span>
+      <span class="field-error" data-field="ramp_sec"></span>
+    </label>
+  </div>
+
+  <label id="body-field">
+    <span>{{T .Lang "home.body"}}</span>
+    <textarea name="body_text" rows="4" placeholder='{"key":"value"}'>{{.Form.BodyText}}</textarea>
+    <span class="field-hint">{{T .Lang "home.body_hint"}}</span>
+    <span class="field-error" data-field="body_text"></span>
   </label>
 
   <label>
     <span>{{T .Lang "home.headers"}}</span>
     <textarea name="headers_text" rows="3" placeholder="Authorization: Bearer xxx">{{.Form.HeadersText}}</textarea>
+    <span class="field-error" data-field="headers_text"></span>
   </label>
 
   <label class="check">
-    <input type="checkbox" name="confirm" value="true" {{if .Form.Confirm}}checked{{end}} required>
+    <input type="checkbox" name="confirm" value="true" {{if .Form.Confirm}}checked{{end}}>
     <span>{{T .Lang "home.confirm"}}</span>
   </label>
+  <span class="field-error" data-field="confirm"></span>
 
   <button type="submit" class="btn primary">{{T .Lang "home.submit"}}</button>
 </form>
+
+{{if .GitHubURL}}
+<a class="github-fork" href="{{.GitHubURL}}" target="_blank" rel="noopener noreferrer" aria-label="{{T .Lang "home.github_fork"}}" title="{{T .Lang "home.github_fork"}}">
+  <svg viewBox="0 0 16 16" width="22" height="22" aria-hidden="true" focusable="false">
+    <path fill="currentColor" d="M5 3.25a2.25 2.25 0 1 1 4.5 0 2.25 2.25 0 0 1-4.5 0Zm-2.5 4.5A2.25 2.25 0 0 1 4.75 5.5h1.5v1.128a2.251 2.251 0 1 0 1.5 0V5.5h1.5a2.25 2.25 0 0 1 2.25 2.25v.878a2.25 2.25 0 1 1-1.5 0v-.878a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0-.75.75v.878a2.25 2.25 0 1 1-1.5 0v-.878Z"/>
+  </svg>
+</a>
+{{end}}
+
 {{template "footer" .}}
 {{end}}

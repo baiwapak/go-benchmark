@@ -23,6 +23,8 @@ func TestCreateValidation(t *testing.T) {
 		MaxConcurrency:  50,
 		MaxDurationSec:  60,
 		MaxTimeoutSec:   30,
+		MaxRampSec:      30,
+		MaxBodyBytes:    65536,
 		MaxInflightJobs: 2,
 	}
 	m := NewManager(cfg, fs)
@@ -35,6 +37,11 @@ func TestCreateValidation(t *testing.T) {
 	_, err = m.Create(dto.CreateBenchRequest{URL: "ftp://x", Confirm: true})
 	if ae, ok := err.(*apperr.AppError); !ok || ae.Field != "url" {
 		t.Fatalf("url err=%v", err)
+	}
+
+	_, err = m.Create(dto.CreateBenchRequest{URL: "http://127.0.0.1", Confirm: true})
+	if ae, ok := err.(*apperr.AppError); !ok || ae.Field != "url" {
+		t.Fatalf("ssrf err=%v", err)
 	}
 
 	_, err = m.Create(dto.CreateBenchRequest{

@@ -15,18 +15,20 @@ import (
 type Params struct {
 	URL         string
 	Method      string
+	Body        string
 	Concurrency int
+	Ramp        time.Duration
 	Duration    time.Duration
 	Timeout     time.Duration
 	Headers     map[string]string
 }
 
 type Sample struct {
-	Latency   time.Duration
-	Status    int
-	Bytes     int64
-	ErrKind   string // empty if ok; timeout|dns|connect|tls|other
-	Success   bool
+	Latency time.Duration
+	Status  int
+	Bytes   int64
+	ErrKind string // empty if ok; timeout|dns|connect|tls|other
+	Success bool
 }
 
 type Engine struct {
@@ -70,13 +72,46 @@ func (e *Engine) Run(ctx context.Context, p Params) error {
 	deadline := time.Now().Add(p.Duration)
 	var wg sync.WaitGroup
 	var stopped atomic.Bool
+	started := time.Now()
+	var allowedWorkers atomic.Int32
+	if p.Ramp <= 0 {
+		allowedWorkers.Store(int32(p.Concurrency))
+	}
 
 	go func() {
 		<-ctx.Done()
 		stopped.Store(true)
 	}()
 
+	if p.Ramp > 0 {
+		go func() {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					elapsed := time.Since(started)
+					if elapsed >= p.Ramp {
+						allowedWorkers.Store(int32(p.Concurrency))
+						return
+					}
+					n := int(float64(p.Concurrency) * elapsed.Seconds() / p.Ramp.Seconds())
+					if n < 1 {
+						n = 1
+					}
+					if n > p.Concurrency {
+						n = p.Concurrency
+					}
+					allowedWorkers.Store(int32(n))
+				}
+			}
+		}()
+	}
+
 	for i := 0; i < p.Concurrency; i++ {
+		workerID := i
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -86,6 +121,10 @@ func (e *Engine) Run(ctx context.Context, p Params) error {
 				}
 				if ctx.Err() != nil {
 					return
+				}
+				if p.Ramp > 0 && workerID >= int(allowedWorkers.Load()) {
+					time.Sleep(20 * time.Millisecond)
+					continue
 				}
 				sample := e.doOne(ctx, client, p)
 				if e.onSample != nil {
@@ -99,13 +138,24 @@ func (e *Engine) Run(ctx context.Context, p Params) error {
 }
 
 func (e *Engine) doOne(ctx context.Context, client *http.Client, p Params) Sample {
-	req, err := http.NewRequestWithContext(ctx, p.Method, p.URL, nil)
+	var body io.Reader
+	if p.Body != "" {
+		body = strings.NewReader(p.Body)
+	}
+	req, err := http.NewRequestWithContext(ctx, p.Method, p.URL, body)
 	if err != nil {
 		return Sample{ErrKind: "other", Success: false}
 	}
 	req.Header.Set("User-Agent", "go-benchmark/1.0")
+	hasCT := false
 	for k, v := range p.Headers {
 		req.Header.Set(k, v)
+		if strings.EqualFold(k, "Content-Type") {
+			hasCT = true
+		}
+	}
+	if p.Body != "" && !hasCT {
+		req.Header.Set("Content-Type", "application/json")
 	}
 
 	start := time.Now()

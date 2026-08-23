@@ -1,6 +1,10 @@
 {{define "bench.html"}}
 {{template "header" .}}
-<section class="bench-page" data-job-id="{{.JobID}}" data-status="{{.Status}}" data-lang="{{.Lang}}">
+<section class="bench-page" data-job-id="{{.JobID}}" data-status="{{.Status}}" data-lang="{{.Lang}}"
+  data-label-rps="{{T .Lang "chart.rps"}}"
+  data-label-latency="{{T .Lang "chart.latency"}}"
+  data-label-success="{{T .Lang "chart.success_rate"}}"
+  data-label-second="{{T .Lang "chart.second"}}">
   <div class="bench-head">
     <h1 id="bench-status-title">
       {{if eq .Status "running"}}{{T .Lang "bench.running"}}
@@ -15,7 +19,6 @@
       <a class="btn" href="/?lang={{.Lang}}">{{T .Lang "bench.back"}}</a>
       {{if .Report}}
       <a class="btn primary" href="/bench/{{.JobID}}/pdf?lang={{.Lang}}">{{T .Lang "bench.download_pdf"}}</a>
-      <a class="btn" href="/bench/{{.JobID}}/report.json">{{T .Lang "bench.download_json"}}</a>
       {{end}}
     </div>
   </div>
@@ -24,11 +27,31 @@
     <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:{{.Progress.ProgressPct}}%"></div></div>
     <div class="stats grid-4">
       <div><span class="label">{{T .Lang "bench.requests"}}</span><strong id="stat-total">{{.Progress.Total}}</strong></div>
-      <div><span class="label">{{T .Lang "bench.rps"}}</span><strong id="stat-rps">{{fmtFloat .Progress.RPS 2}}</strong></div>
+      <div>{{template "labelTip" (dict "Lang" .Lang "LabelKey" "bench.rps" "TipKey" "report.rps.tip")}}<strong id="stat-rps">{{fmtFloat .Progress.RPS 2}}</strong></div>
       <div><span class="label">{{T .Lang "bench.success_rate"}}</span><strong id="stat-rate">{{fmtFloat .Progress.SuccessRate 2}}%</strong></div>
       <div><span class="label">{{T .Lang "bench.avg_latency"}}</span><strong id="stat-lat">{{fmtFloat .Progress.AvgLatencyMs 2}} ms</strong></div>
     </div>
   </div>
+
+  <section class="chart-panel" id="chart-panel">
+    <h2>{{T .Lang "chart.title"}}</h2>
+    <div class="chart-grid">
+      <div class="chart-box">
+        <h3 class="heading-with-tip chart-heading">{{T .Lang "chart.rps"}}{{template "tipIcon" (dict "Lang" .Lang "Key" "report.rps.tip")}}</h3>
+        <canvas id="chart-rps" width="640" height="180" role="img" aria-label="{{T .Lang "chart.rps"}}"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3>{{T .Lang "chart.latency"}}</h3>
+        <canvas id="chart-latency" width="640" height="180" role="img" aria-label="{{T .Lang "chart.latency"}}"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3>{{T .Lang "chart.success_rate"}}</h3>
+        <canvas id="chart-success" width="640" height="180" role="img" aria-label="{{T .Lang "chart.success_rate"}}"></canvas>
+      </div>
+    </div>
+    <script type="application/json" id="bench-series">{{toJSON .Series}}</script>
+    <p class="glossary-link-hint"><a href="/glossary?lang={{.Lang}}">{{T .Lang "glossary.more"}}</a></p>
+  </section>
 
   {{if .Report}}
   <section class="report">
@@ -36,7 +59,7 @@
     <dl class="kv">
       <dt>{{T .Lang "report.target"}}</dt><dd><code>{{.Report.URL}}</code></dd>
       <dt>{{T .Lang "report.params"}}</dt>
-      <dd>{{.Report.Method}} · {{T .Lang "home.concurrency"}} {{.Report.Concurrency}} · {{.Report.DurationSec}}s · timeout {{.Report.TimeoutSec}}s</dd>
+      <dd>{{.Report.Method}} · {{T .Lang "home.concurrency"}} {{.Report.Concurrency}}{{if gt .Report.RampSec 0}} · {{T .Lang "home.ramp"}} {{.Report.RampSec}}s{{end}} · {{.Report.DurationSec}}s · timeout {{.Report.TimeoutSec}}s</dd>
       <dt>{{T .Lang "report.generated_at"}}</dt><dd>{{.Report.FinishedAt.Format "2006-01-02 15:04:05"}}</dd>
     </dl>
 
@@ -45,21 +68,21 @@
       <div><span class="label">{{T .Lang "report.total"}}</span><strong>{{.Report.Total}}</strong></div>
       <div><span class="label">{{T .Lang "report.success"}}</span><strong>{{.Report.Success}}</strong></div>
       <div><span class="label">{{T .Lang "report.failed"}}</span><strong>{{.Report.Failed}}</strong></div>
-      <div><span class="label">{{T .Lang "report.rps"}}</span><strong>{{fmtFloat .Report.RPS 2}}</strong></div>
+      <div>{{template "labelTip" (dict "Lang" .Lang "LabelKey" "report.rps" "TipKey" "report.rps.tip")}}<strong>{{fmtFloat .Report.RPS 2}}</strong></div>
       <div><span class="label">{{T .Lang "bench.success_rate"}}</span><strong>{{fmtFloat .Report.SuccessRate 2}}%</strong></div>
       <div><span class="label">{{T .Lang "report.duration"}}</span><strong>{{fmtFloat .Report.ElapsedSec 2}}s</strong></div>
       <div><span class="label">{{T .Lang "report.bytes"}}</span><strong>{{.Report.BytesTotal}}</strong></div>
     </div>
 
-    <h2>{{T .Lang "report.latency"}}</h2>
+    <h2 class="heading-with-tip">{{T .Lang "report.latency"}}{{template "tipIcon" (dict "Lang" .Lang "Key" "report.latency.tip")}}</h2>
     <div class="stats grid-4">
       <div><span class="label">{{T .Lang "report.min"}}</span><strong>{{fmtFloat .Report.Latency.MinMs 2}}</strong></div>
       <div><span class="label">{{T .Lang "report.avg"}}</span><strong>{{fmtFloat .Report.Latency.AvgMs 2}}</strong></div>
       <div><span class="label">{{T .Lang "report.max"}}</span><strong>{{fmtFloat .Report.Latency.MaxMs 2}}</strong></div>
-      <div><span class="label">{{T .Lang "report.p50"}}</span><strong>{{fmtFloat .Report.Latency.P50Ms 2}}</strong></div>
-      <div><span class="label">{{T .Lang "report.p90"}}</span><strong>{{fmtFloat .Report.Latency.P90Ms 2}}</strong></div>
-      <div><span class="label">{{T .Lang "report.p95"}}</span><strong>{{fmtFloat .Report.Latency.P95Ms 2}}</strong></div>
-      <div><span class="label">{{T .Lang "report.p99"}}</span><strong>{{fmtFloat .Report.Latency.P99Ms 2}}</strong></div>
+      <div>{{template "labelTip" (dict "Lang" .Lang "LabelKey" "report.p50" "TipKey" "report.p50.tip")}}<strong>{{fmtFloat .Report.Latency.P50Ms 2}}</strong></div>
+      <div>{{template "labelTip" (dict "Lang" .Lang "LabelKey" "report.p90" "TipKey" "report.p90.tip")}}<strong>{{fmtFloat .Report.Latency.P90Ms 2}}</strong></div>
+      <div>{{template "labelTip" (dict "Lang" .Lang "LabelKey" "report.p95" "TipKey" "report.p95.tip")}}<strong>{{fmtFloat .Report.Latency.P95Ms 2}}</strong></div>
+      <div>{{template "labelTip" (dict "Lang" .Lang "LabelKey" "report.p99" "TipKey" "report.p99.tip")}}<strong>{{fmtFloat .Report.Latency.P99Ms 2}}</strong></div>
     </div>
 
     <h2>{{T .Lang "report.status"}}</h2>
